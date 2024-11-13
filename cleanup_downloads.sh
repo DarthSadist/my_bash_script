@@ -94,7 +94,7 @@ move_executables() {
 declare -A file_types=( 
     ["Изображений"]="jpg jpeg png gif bmp tiff" 
     ["Музыки"]="mp3 wav flac ogg" 
-    ["Видео"]="mp4 mkv avi mov wmv" 
+    ["Видео"]="mp4 mkv avi mov wmv MOV" 
     ["Архивов"]="zip tgz tar gz bz2 xz rar 7z" 
     ["DEB пакетов"]="deb" 
 )
