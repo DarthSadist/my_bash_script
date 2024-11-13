@@ -22,7 +22,10 @@ ARCHIVES_DIR="$HOME/Archives"
 # Создаем необходимые папки, если они не существуют
 mkdir -p "$PROGRAM_DIR" "$ARCHIVES_DIR" "$DOCUMENTS_DIR"
 
-# Функция для перемещения файлов и вывода сообщения
+# Инициализация массива для хранения результатов
+declare -A results
+
+# Функция для перемещения файлов и сбора результатов
 move_files() {
     local src="$1"
     local dest="$2"
@@ -42,11 +45,7 @@ move_files() {
         done
     done
 
-    if [ $count -gt 0 ]; then
-        echo -e "${color}${type_name} перемещено ${count} файлов.${RESET}"
-    else
-        echo -e "${RED}Файлов типа ${type_name} не обнаружено.${RESET}"
-    fi
+    results["$type_name"]="$count $color"
     shopt -u nullglob
 }
 
@@ -69,7 +68,7 @@ move_documents() {
     done
 
     if [ $count -gt 0 ]; then
-        echo -e "${BLUE}Документов без расширения перемещено ${count} файлов.${RESET}"
+        results["Документов без расширения"]="$count $BLUE"
     fi
 }
 
@@ -85,19 +84,19 @@ move_executables() {
     done < <(find "$src" -maxdepth 1 -type f -executable -print0)
 
     if [ $count -gt 0 ]; then
-        echo -e "${PINK}Исполняемых файлов перемещено ${count} файлов.${RESET}"
+        results["Исполняемых файлов"]="$count $PINK"
     else
-        echo -e "${RED}Исполняемых файлов не обнаружено.${RESET}"
+        results["Исполняемых файлов"]="0 $PINK"
     fi
 }
 
 # Перемещение файлов по типам
-declare -A file_types=(
-    ["Изображений"]="jpg jpeg png gif bmp tiff"
-    ["Музыки"]="mp3 wav flac ogg"
-    ["Видео"]="mp4 mkv avi mov wmv"
-    ["Архивов"]="zip tgz tar gz bz2 xz rar 7z"
-    ["DEB пакетов"]="deb"
+declare -A file_types=( 
+    ["Изображений"]="jpg jpeg png gif bmp tiff" 
+    ["Музыки"]="mp3 wav flac ogg" 
+    ["Видео"]="mp4 mkv avi mov wmv" 
+    ["Архивов"]="zip tgz tar gz bz2 xz rar 7z" 
+    ["DEB пакетов"]="deb" 
 )
 
 # Перемещение файлов разных типов с соответствующими цветами
@@ -114,6 +113,18 @@ move_files "$DOWNLOADS_DIR" "$PROGRAM_DIR" "${file_types[DEB пакетов]}" "
 
 # Перемещение исполняемых файлов в "Программы"
 move_executables "$DOWNLOADS_DIR" "$PROGRAM_DIR"
+
+# Вывод результатов в виде таблицы
+echo -e "\n${BLUE}Результаты перемещения файлов:${RESET}"
+printf "%-30s %s\n" "Тип файла" "Количество"
+echo "-----------------------------------------"
+
+for type in "${!results[@]}"; do
+    count_info=${results[$type]}
+    count=$(echo $count_info | awk '{print $1}')
+    color=$(echo $count_info | awk '{print $2}')
+    printf "%-30s ${color}%s${RESET}\n" "$type" "$count"
+done
 
 # Сообщение об окончании очистки
 echo -e "${RED}Очистка завершена.${RESET}"
