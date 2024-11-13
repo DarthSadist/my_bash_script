@@ -101,9 +101,9 @@ declare -A file_types=(
 
 # Перемещение файлов разных типов с соответствующими цветами
 move_files "$DOWNLOADS_DIR" "$IMAGES_DIR" "${file_types[Изображения]}" "Изображения" "$GREEN"
-move_files "$DOWNLOADS_DIR" "$MUSIC_DIR" "${file_types[Музыки]}" "Музыка" "$PURPLE"
+move_files "$DOWNLOADS_DIR" "$MUSIC_DIR" "${file_types[Музыка]}" "Музыка" "$PURPLE"
 move_files "$DOWNLOADS_DIR" "$VIDEOS_DIR" "${file_types[Видео]}" "Видео" "$ORANGE"
-move_files "$DOWNLOADS_DIR" "$ARCHIVES_DIR" "${file_types[Архивов]}" "Архивы" "$YELLOW"
+move_files "$DOWNLOADS_DIR" "$ARCHIVES_DIR" "${file_types[Архивы]}" "Архивы" "$YELLOW"
 
 # Перемещение всех файлов в "Документы"
 move_documents "$DOWNLOADS_DIR" "$DOCUMENTS_DIR"
@@ -128,4 +128,3 @@ done
 
 # Сообщение об окончании очистки
 echo -e "${RED}Очистка папки Загрузки завершена.${RESET}"
-
