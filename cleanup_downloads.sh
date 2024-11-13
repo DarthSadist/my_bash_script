@@ -68,7 +68,7 @@ move_documents() {
     done
 
     if [ $count -gt 0 ]; then
-        results["Документов без расширения"]="$count $BLUE"
+        results["Документы без расширения"]="$count $BLUE"
     fi
 }
 
@@ -84,26 +84,26 @@ move_executables() {
     done < <(find "$src" -maxdepth 1 -type f -executable -print0)
 
     if [ $count -gt 0 ]; then
-        results["Исполняемых файлов"]="$count $PINK"
+        results["Исполняемые файлы"]="$count $PINK"
     else
-        results["Исполняемых файлов"]="0 $PINK"
+        results["Исполняемые файлы"]="0 $PINK"
     fi
 }
 
 # Перемещение файлов по типам
 declare -A file_types=( 
-    ["Изображений"]="jpg jpeg png gif bmp tiff" 
-    ["Музыки"]="mp3 wav flac ogg" 
+    ["Изображения"]="jpg jpeg png gif bmp tiff" 
+    ["Музыка"]="mp3 wav flac ogg" 
     ["Видео"]="mp4 mkv avi mov wmv MOV" 
-    ["Архивов"]="zip tgz tar gz bz2 xz rar 7z" 
-    ["DEB пакетов"]="deb" 
+    ["Архивы"]="zip tgz tar gz bz2 xz rar 7z" 
+    ["DEB пакеты"]="deb" 
 )
 
 # Перемещение файлов разных типов с соответствующими цветами
-move_files "$DOWNLOADS_DIR" "$IMAGES_DIR" "${file_types[Изображений]}" "Изображений" "$GREEN"
-move_files "$DOWNLOADS_DIR" "$MUSIC_DIR" "${file_types[Музыки]}" "Музыки" "$PURPLE"
+move_files "$DOWNLOADS_DIR" "$IMAGES_DIR" "${file_types[Изображений]}" "Изображения" "$GREEN"
+move_files "$DOWNLOADS_DIR" "$MUSIC_DIR" "${file_types[Музыки]}" "Музыка" "$PURPLE"
 move_files "$DOWNLOADS_DIR" "$VIDEOS_DIR" "${file_types[Видео]}" "Видео" "$ORANGE"
-move_files "$DOWNLOADS_DIR" "$ARCHIVES_DIR" "${file_types[Архивов]}" "Архивов" "$YELLOW"
+move_files "$DOWNLOADS_DIR" "$ARCHIVES_DIR" "${file_types[Архивов]}" "Архивы" "$YELLOW"
 
 # Перемещение всех файлов в "Документы"
 move_documents "$DOWNLOADS_DIR" "$DOCUMENTS_DIR"
@@ -127,5 +127,5 @@ for type in "${!results[@]}"; do
 done
 
 # Сообщение об окончании очистки
-echo -e "${RED}Очистка завершена.${RESET}"
+echo -e "${RED}Очистка папки Загрузки завершена.${RESET}"
 
