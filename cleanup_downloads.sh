@@ -100,7 +100,7 @@ declare -A file_types=(
 )
 
 # Перемещение файлов разных типов с соответствующими цветами
-move_files "$DOWNLOADS_DIR" "$IMAGES_DIR" "${file_types[Изображений]}" "Изображения" "$GREEN"
+move_files "$DOWNLOADS_DIR" "$IMAGES_DIR" "${file_types[Изображения]}" "Изображения" "$GREEN"
 move_files "$DOWNLOADS_DIR" "$MUSIC_DIR" "${file_types[Музыки]}" "Музыка" "$PURPLE"
 move_files "$DOWNLOADS_DIR" "$VIDEOS_DIR" "${file_types[Видео]}" "Видео" "$ORANGE"
 move_files "$DOWNLOADS_DIR" "$ARCHIVES_DIR" "${file_types[Архивов]}" "Архивы" "$YELLOW"
