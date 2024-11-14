@@ -1,22 +1,19 @@
 #!/bin/bash
 
 # Проверка, был ли передан аргумент (URL)
-if [ "$1" == "" ]; then
+if [ -z "$1" ]; then
     echo "usage: $0 URL"
     exit 1
 fi
 
 # Извлечение имени хоста из URL
-# Удаляем 'http://' и оставляем только хост
-HOST=$(echo $1 | sed 's|http://||' | sed -r 's|([^/]+)/.*|\1|')
+HOST=$(echo "$1" | sed 's|http://||' | sed -r 's|([^/]+)/.*|\1|')
 
 # Извлечение имени файла из URL
-# Оставляем только часть после последнего '/'
-FILENAME=$(echo "$1" | sed -r 's|.*/(.*)|\1|')
+FILENAME=$(basename "$1")
 
 # Извлечение пути к файлу из URL
-# Удаляем 'http://', имя хоста и имя файла
-PATH=$(echo "$1" | sed 's|http://||' | sed -r "s|$HOST||" | sed "s|/$FILENAME||")
+PATH=$(dirname "$1" | sed 's|http://||' | sed "s|$HOST||")
 
 # Установка порта для HTTP
 PORT=80
@@ -37,11 +34,14 @@ echo -e "GET $PATH/$FILENAME $HEADERS" >&3
 /bin/cat <&3 > $TEMP_FILE
 
 # Извлечение только тела ответа
-/usr/bin/tail $TEMP_FILE -n +$((`/bin/sed $TEMP_FILE -e '/^\r$/q' | /usr/bin/wc -l` + 1)) > $FILENAME
+/usr/bin/tail -n +$((`/bin/sed $TEMP_FILE -e '/^\r$/q' | /usr/bin/wc -l` + 1)) $TEMP_FILE > "$FILENAME"
 
 # Удаление временного файла
 /bin/rm $TEMP_FILE
 
-# Вывод сообщения об успешном завершении
-echo "File downloaded as: $FILENAME"
+# Перемещение загруженного файла в директорию загрузок
+DOWNLOAD_DIR="$HOME/Загрузки"
+mv "$FILENAME" "$DOWNLOAD_DIR/$FILENAME"
 
+# Вывод сообщения об успешном завершении
+echo "File downloaded to: $DOWNLOAD_DIR/$FILENAME"
