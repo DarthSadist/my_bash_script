@@ -17,10 +17,21 @@ install_package() {
     fi
 }
 
+# Обновление списков пакетов
+echo "Обновление списков пакетов..."
+sudo apt update
+
 # Установка Zsh и Git
 echo "Проверка наличия Zsh и Git..."
-install_package zsh
 install_package git
+
+# Установка Zsh
+if ! command -v zsh &> /dev/null; then
+    echo "Установка Zsh..."
+    sudo apt install -y zsh || { echo "Не удалось установить Zsh. Проверьте репозитории."; exit 1; }
+else
+    echo "Zsh уже установлен."
+fi
 
 # Установка Oh My Zsh
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
