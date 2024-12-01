@@ -190,6 +190,13 @@ install_zsh() {
         git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$USER_HOME/.powerlevel10k"
     fi
 
+    # Установка fzf
+    echo "Установка fzf..."
+    if [ ! -d "$USER_HOME/.fzf" ]; then
+        git clone --depth 1 https://github.com/junegunn/fzf.git "$USER_HOME/.fzf"
+        "$USER_HOME/.fzf/install" --all
+    fi
+
     echo "Шаг 7: Установка конфигурационного файла из репозитория"
     echo "Клонирование репозитория с конфигурацией..."
     
@@ -201,10 +208,12 @@ install_zsh() {
         exit 1
     fi
 
-    # Копируем конфигурационный файл
+    # Копируем конфигурационный файл и добавляем настройку FZF_BASE
     if [ -f "$TEMP_DIR/.zshrc" ]; then
         cp "$TEMP_DIR/.zshrc" "$USER_HOME/.zshrc"
-        echo "Конфигурационный файл успешно установлен из репозитория"
+        echo "Конфигурационный файл скопирован, добавляем настройку fzf..."
+        echo -e "\n# fzf configuration\nexport FZF_BASE=$USER_HOME/.fzf" >> "$USER_HOME/.zshrc"
+        echo "Конфигурационный файл успешно установлен и настроен"
     else
         echo "Ошибка: конфигурационный файл .zshrc не найден в репозитории"
         rm -rf "$TEMP_DIR"
