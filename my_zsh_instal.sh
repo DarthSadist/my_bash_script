@@ -14,7 +14,7 @@ readonly ZSH_SYNTAX_HIGHLIGHTING_URL="https://github.com/zsh-users/zsh-syntax-hi
 readonly ZSH_AUTOSUGGESTIONS_URL="https://github.com/zsh-users/zsh-autosuggestions.git"
 readonly POWERLEVEL10K_URL="https://github.com/romkatv/powerlevel10k.git"
 readonly FZF_URL="https://github.com/junegunn/fzf.git"
-readonly CONFIG_REPO_URL="git@github.com:DarthSadist/my_zsh.git"
+readonly CONFIG_REPO_URL="https://github.com/ohmyzsh/ohmyzsh.git"
 
 # Функции для форматированного вывода
 print_step() {
@@ -117,13 +117,8 @@ check_dependencies() {
 # Функция проверки доступа к GitHub
 check_github_access() {
     print_info "Проверка доступа к GitHub..."
-    if ! ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
-        print_error "Нет доступа к GitHub через SSH"
-        print_info "Для настройки SSH выполните:"
-        echo "      1. ssh-keygen -t ed25519 -C \"your_email@example.com\""
-        echo "      2. eval \"\$(ssh-agent -s)\""
-        echo "      3. ssh-add ~/.ssh/id_ed25519"
-        echo "      4. cat ~/.ssh/id_ed25519.pub # Добавьте ключ на GitHub"
+    if ! curl -s https://api.github.com/zen > /dev/null; then
+        print_error "Нет доступа к GitHub. Проверьте подключение к интернету"
         return 1
     fi
     print_success "Доступ к GitHub подтвержден"
@@ -133,7 +128,7 @@ check_github_access() {
 # Функция проверки существующих установок
 check_existing_installation() {
     local USER_HOME="$1"
-    
+
     print_step "Проверка существующих установок"
     
     if [ -d "$USER_HOME/.oh-my-zsh" ] || [ -f "$USER_HOME/.zshrc" ]; then
@@ -241,7 +236,9 @@ install_zsh() {
 
     print_step "Установка плагинов"
     local plugins_dir="${ZSH_CUSTOM:-$USER_HOME/.oh-my-zsh/custom}/plugins"
+    local themes_dir="${ZSH_CUSTOM:-$USER_HOME/.oh-my-zsh/custom}/themes"
     mkdir -p "$plugins_dir"
+    mkdir -p "$themes_dir"
     
     local total_plugins=4
     local current_plugin=0
@@ -261,9 +258,9 @@ install_zsh() {
     fi
     
     # Установка powerlevel10k
-    if [ ! -d "$USER_HOME/.powerlevel10k" ]; then
+    if [ ! -d "$themes_dir/powerlevel10k" ]; then
         ((current_plugin++))
-        install_plugin "powerlevel10k" "$POWERLEVEL10K_URL" "$USER_HOME/.powerlevel10k" $current_plugin $total_plugins
+        install_plugin "powerlevel10k" "$POWERLEVEL10K_URL" "$themes_dir/powerlevel10k" $current_plugin $total_plugins
     fi
 
     # Установка fzf
@@ -289,53 +286,97 @@ install_config() {
     local USER_HOME="$1"
     
     print_step "Установка пользовательской конфигурации"
+    print_info "Создание конфигурации..."
     
-    # Создаем временную директорию и клонируем репозиторий
-    TEMP_DIR=$(mktemp -d)
-    print_info "Клонирование репозитория конфигурации..."
+    # Создаем базовую конфигурацию
+    cat > "$USER_HOME/.zshrc" << 'EOL'
+# Enable Powerlevel10k instant prompt
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
 
-    if run_with_spinner "Клонирование конфигурации" git clone "$CONFIG_REPO_URL" "$TEMP_DIR"; then
-        print_info "Проверка структуры репозитория..."
-        
-        # Проверяем содержимое клонированного репозитория
-        if [ ! -d "$TEMP_DIR" ]; then
-            print_error "Ошибка: директория репозитория не создана"
-            exit 1
-        fi
+# Path to oh-my-zsh installation
+export ZSH="$HOME/.oh-my-zsh"
 
-        # Выводим содержимое для отладки
-        ls -la "$TEMP_DIR"
+# Theme configuration
+ZSH_THEME="powerlevel10k/powerlevel10k"
+POWERLEVEL9K_MODE="nerdfont-complete"
 
-        # Копируем конфигурационный файл и добавляем настройку FZF_BASE
-        if [ -f "$TEMP_DIR/.zshrc" ]; then
-            print_info "Найден файл конфигурации, устанавливаем..."
-            if run_with_spinner "Установка конфигурации" cp "$TEMP_DIR/.zshrc" "$USER_HOME/.zshrc"; then
-                echo -e "\n# fzf configuration\nexport FZF_BASE=$USER_HOME/.fzf" >> "$USER_HOME/.zshrc"
-                print_success "Конфигурационный файл установлен и настроен"
-            else
-                print_error "Ошибка при копировании конфигурационного файла"
-                rm -rf "$TEMP_DIR"
-                exit 1
-            fi
-        else
-            print_error "Файл .zshrc не найден в репозитории"
-            print_info "Содержимое репозитория:"
-            ls -la "$TEMP_DIR"
-            rm -rf "$TEMP_DIR"
-            exit 1
-        fi
-    else
-        print_error "Ошибка при клонировании репозитория с конфигурацией"
-        print_info "Проверьте доступность репозитория: $CONFIG_REPO_URL"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
+# History configuration
+HISTSIZE=10000
+SAVEHIST=10000
+HISTFILE=~/.zsh_history
+setopt appendhistory
+setopt INC_APPEND_HISTORY
+setopt SHARE_HISTORY
 
-    # Очищаем временную директорию
-    rm -rf "$TEMP_DIR"
+# Plugins configuration
+plugins=(
+    git
+    docker
+    docker-compose
+    command-not-found
+    history-substring-search
+    colored-man-pages
+    zsh-syntax-highlighting
+    zsh-autosuggestions
+)
+
+# Source oh-my-zsh
+source $ZSH/oh-my-zsh.sh
+
+# User configuration
+export LANG=en_US.UTF-8
+export EDITOR='vim'
+
+# Better directory navigation
+setopt AUTO_CD
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt PUSHD_SILENT
+
+# Completion configuration
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+setopt COMPLETE_ALIASES
+
+# Useful aliases
+alias ll='ls -lah'
+alias la='ls -A'
+alias l='ls -CF'
+alias zshconfig="$EDITOR ~/.zshrc"
+alias ohmyzsh="$EDITOR ~/.oh-my-zsh"
+alias reload="source ~/.zshrc"
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+
+# Directory shortcuts
+hash -d downloads=~/Downloads
+hash -d documents=~/Documents
+hash -d projects=~/Projects
+
+# fzf configuration
+export FZF_BASE=$HOME/.fzf
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# Custom key bindings
+bindkey '^[[A' history-substring-search-up
+bindkey '^[[B' history-substring-search-down
+bindkey "^[[H" beginning-of-line
+bindkey "^[[F" end-of-line
+bindkey "^[[3~" delete-char
+bindkey "^[[1;5C" forward-word
+bindkey "^[[1;5D" backward-word
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+EOL
+
+    print_success "Конфигурация создана"
 
     # Установка прав на файлы
-    chown -R $(whoami):$(whoami) "$USER_HOME/.oh-my-zsh" "$USER_HOME/.zshrc" "$USER_HOME/.powerlevel10k" 2>/dev/null
+    chown -R $(whoami):$(whoami) "$USER_HOME/.oh-my-zsh" "$USER_HOME/.zshrc" 2>/dev/null
 
     echo
     print_success "Установка успешно завершена!"
