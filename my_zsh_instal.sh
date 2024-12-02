@@ -37,58 +37,57 @@ print_warning() {
     echo -e "   ⚠️  ${YELLOW}$1${NC}"
 }
 
-# Функция для отображения спиннера
-spinner() {
-    local pid=$1
-    local delay=0.1
-    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        local temp=${spinstr#?}
-        printf "   ${BLUE}%c${NC}  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
-}
-
-# Функция для выполнения команды с индикатором прогресса
-run_with_spinner() {
-    local message=$1
-    shift
-    echo -ne "   🔄 $message"
-    ("$@") &>/dev/null &
-    spinner $!
-    if [ $? -eq 0 ]; then
-        echo -e "\r   ✅ ${GREEN}$message${NC}"
-        return 0
-    else
-        echo -e "\r   ❌ ${RED}$message${NC}"
-        return 1
-    fi
-}
-
-# Функция для отображения прогресс-бара
+# Функция отображения прогресса
 progress_bar() {
     local current=$1
     local total=$2
-    local title=$3
-    local width=50
+    local prefix=$3
+    local width=30
     local percentage=$((current * 100 / total))
     local completed=$((width * current / total))
     local remaining=$((width - completed))
     
-    printf "\r   📊 ${BOLD}%s${NC} [" "$title"
-    printf "%${completed}s" | tr ' ' '█'
-    printf "%${remaining}s" | tr ' ' '░'
-    printf "] %d%%" "$percentage"
+    printf "\r%s [" "$prefix"
+    printf "%${completed}s" | tr ' ' '='
+    printf "%${remaining}s" | tr ' ' ' '
+    printf "] %3d%%" "$percentage"
     
     if [ "$current" -eq "$total" ]; then
         echo
     fi
 }
 
-# Функция для проверки зависимостей
+# Функция запуска команды со спиннером
+run_with_spinner() {
+    local message=$1
+    shift
+    local spinner=( '⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏' )
+    local pid
+    
+    printf "   🔄 %s " "$message"
+    ("$@") &
+    pid=$!
+    
+    local i=0
+    while kill -0 $pid 2>/dev/null; do
+        printf "\b%s" "${spinner[i]}"
+        i=$(((i + 1) % ${#spinner[@]}))
+        sleep 0.1
+    done
+    
+    wait $pid
+    local status=$?
+    printf "\b "
+    if [ $status -eq 0 ]; then
+        echo "✅"
+        return 0
+    else
+        echo "❌"
+        return 1
+    fi
+}
+
+# Функция проверки зависимостей
 check_dependencies() {
     local missing_deps=()
     local deps=("git" "curl" "zsh")
@@ -115,7 +114,7 @@ check_dependencies() {
     return 0
 }
 
-# Функция для проверки доступа к GitHub
+# Функция проверки доступа к GitHub
 check_github_access() {
     print_info "Проверка доступа к GitHub..."
     if ! ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
@@ -214,12 +213,12 @@ install_plugin() {
     local current=$4
     local total=$5
 
-    progress_bar $current $total "Установка плагинов"
+    progress_bar "$current" "$total" "Установка плагинов"
+    printf "\n"
+    
     if run_with_spinner "$name" git clone -q "$url" "$install_path"; then
-        print_success "$name установлен"
         return 0
     else
-        print_error "Ошибка при установке $name"
         return 1
     fi
 }
@@ -348,6 +347,103 @@ install_config() {
     echo
 }
 
+# Функция проверки версий
+check_versions() {
+    local USER_HOME="$1"
+    print_step "Проверка версий компонентов"
+    
+    # Проверка версии zsh
+    if command -v zsh >/dev/null 2>&1; then
+        local zsh_version=$(zsh --version | cut -d' ' -f2)
+        print_info "Версия Zsh: $zsh_version"
+    fi
+    
+    # Проверка версии oh-my-zsh
+    if [ -d "$USER_HOME/.oh-my-zsh" ]; then
+        if [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+            local omz_version=$(grep 'OMZVERSION=' "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" | cut -d'"' -f2)
+            print_info "Версия Oh My Zsh: $omz_version"
+        fi
+    fi
+    
+    # Проверка версии powerlevel10k
+    if [ -d "$USER_HOME/.powerlevel10k" ]; then
+        cd "$USER_HOME/.powerlevel10k" || return
+        local p10k_version=$(git describe --tags --abbrev=0 2>/dev/null)
+        print_info "Версия Powerlevel10k: $p10k_version"
+        cd - >/dev/null || return
+    fi
+}
+
+# Функция обновления компонентов
+update_components() {
+    local USER_HOME="$1"
+    print_step "Обновление компонентов"
+    
+    # Обновление oh-my-zsh
+    if [ -d "$USER_HOME/.oh-my-zsh" ]; then
+        print_info "Обновление Oh My Zsh..."
+        if run_with_spinner "Обновление Oh My Zsh" env ZSH="$USER_HOME/.oh-my-zsh" sh "$USER_HOME/.oh-my-zsh/tools/upgrade.sh"; then
+            print_success "Oh My Zsh обновлен"
+        else
+            print_error "Ошибка при обновлении Oh My Zsh"
+        fi
+    fi
+    
+    # Обновление powerlevel10k
+    if [ -d "$USER_HOME/.powerlevel10k" ]; then
+        print_info "Обновление Powerlevel10k..."
+        cd "$USER_HOME/.powerlevel10k" || return
+        if run_with_spinner "Обновление Powerlevel10k" git pull --quiet; then
+            print_success "Powerlevel10k обновлен"
+        else
+            print_error "Ошибка при обновлении Powerlevel10k"
+        fi
+        cd - >/dev/null || return
+    fi
+    
+    # Обновление плагинов
+    local plugins_dir="${ZSH_CUSTOM:-$USER_HOME/.oh-my-zsh/custom}/plugins"
+    
+    if [ -d "$plugins_dir/zsh-syntax-highlighting" ]; then
+        print_info "Обновление zsh-syntax-highlighting..."
+        cd "$plugins_dir/zsh-syntax-highlighting" || return
+        if run_with_spinner "Обновление zsh-syntax-highlighting" git pull --quiet; then
+            print_success "zsh-syntax-highlighting обновлен"
+        else
+            print_error "Ошибка при обновлении zsh-syntax-highlighting"
+        fi
+        cd - >/dev/null || return
+    fi
+    
+    if [ -d "$plugins_dir/zsh-autosuggestions" ]; then
+        print_info "Обновление zsh-autosuggestions..."
+        cd "$plugins_dir/zsh-autosuggestions" || return
+        if run_with_spinner "Обновление zsh-autosuggestions" git pull --quiet; then
+            print_success "zsh-autosuggestions обновлен"
+        else
+            print_error "Ошибка при обновлении zsh-autosuggestions"
+        fi
+        cd - >/dev/null || return
+    fi
+    
+    # Обновление fzf
+    if [ -d "$USER_HOME/.fzf" ]; then
+        print_info "Обновление fzf..."
+        cd "$USER_HOME/.fzf" || return
+        if run_with_spinner "Обновление fzf" git pull --quiet; then
+            if run_with_spinner "Переустановка fzf" ./install --all; then
+                print_success "fzf обновлен"
+            else
+                print_error "Ошибка при переустановке fzf"
+            fi
+        else
+            print_error "Ошибка при обновлении fzf"
+        fi
+        cd - >/dev/null || return
+    fi
+}
+
 # Основная функция
 main() {
     clear
@@ -355,10 +451,12 @@ main() {
     echo "│     Установка Zsh и Oh My Zsh     │"
     echo "╰───────────────────────────────────╯"
     echo
-    print_info "Выберите вариант установки:"
+    print_info "Выберите действие:"
     echo "      1) Установка для текущего пользователя"
     echo "      2) Установка для root"
-    echo "      3) Отмена установки"
+    echo "      3) Проверка версий компонентов"
+    echo "      4) Обновление компонентов"
+    echo "      5) Отмена"
     echo
     
     while true; do
@@ -371,7 +469,7 @@ main() {
                     if [ $? -eq 0 ]; then
                         check_existing_installation "$HOME"
                         if [ $? -eq 0 ]; then
-                            install_zsh "$HOME" "user"
+                            install_zsh "$HOME"
                         fi
                     fi
                 fi
@@ -388,18 +486,26 @@ main() {
                     if [ $? -eq 0 ]; then
                         check_existing_installation "/root"
                         if [ $? -eq 0 ]; then
-                            install_zsh "/root" "root"
+                            install_zsh "/root"
                         fi
                     fi
                 fi
                 break
                 ;;
             3)
-                print_info "Установка отменена"
+                check_versions "$HOME"
+                break
+                ;;
+            4)
+                update_components "$HOME"
+                break
+                ;;
+            5)
+                print_info "Операция отменена"
                 exit 0
                 ;;
             *)
-                print_error "Введите 1, 2 или 3"
+                print_error "Введите число от 1 до 5"
                 ;;
         esac
     done
