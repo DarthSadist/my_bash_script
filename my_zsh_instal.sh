@@ -303,12 +303,19 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 POWERLEVEL9K_MODE="nerdfont-complete"
 
 # History configuration
-HISTSIZE=10000
-SAVEHIST=10000
 HISTFILE=~/.zsh_history
-setopt appendhistory
-setopt INC_APPEND_HISTORY
-setopt SHARE_HISTORY
+HISTSIZE=1000000
+SAVEHIST=1000000
+setopt EXTENDED_HISTORY          # Добавляет временные метки в историю
+setopt HIST_EXPIRE_DUPS_FIRST   # Удаляет дубликаты первыми при очистке истории
+setopt HIST_IGNORE_DUPS         # Не сохраняет повторяющиеся команды
+setopt HIST_IGNORE_SPACE        # Не сохраняет команды, начинающиеся с пробела
+setopt HIST_VERIFY              # Показывает команду из истории перед выполнением
+setopt HIST_FIND_NO_DUPS       # Не показывает дубликаты при поиске
+setopt SHARE_HISTORY           # Делится историей между сессиями
+setopt INC_APPEND_HISTORY      # Добавляет команды в историю по мере их ввода
+setopt HIST_REDUCE_BLANKS      # Убирает лишние пробелы
+setopt HIST_SAVE_NO_DUPS       # Не сохраняет дубликаты в файл истории
 
 # Plugins configuration
 plugins=(
@@ -340,6 +347,15 @@ zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 setopt COMPLETE_ALIASES
 
+# History search configuration
+autoload -U history-search-end
+zle -N history-beginning-search-backward-end history-search-end
+zle -N history-beginning-search-forward-end history-search-end
+bindkey "^[[A" history-beginning-search-backward-end  # Стрелка вверх
+bindkey "^[[B" history-beginning-search-forward-end   # Стрелка вниз
+bindkey '^r' history-incremental-pattern-search-backward  # Ctrl+R
+bindkey '^s' history-incremental-pattern-search-forward   # Ctrl+S
+
 # Useful aliases
 alias ll='ls -lah'
 alias la='ls -A'
@@ -351,6 +367,13 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
 
+# History aliases
+alias h='fc -l 1'               # Показать всю историю
+alias hs='fc -l 1 | grep'       # Поиск в истории
+alias hsi='fc -l 1 | grep -i'   # Поиск в истории (без учета регистра)
+# Топ 10 самых используемых команд
+alias top10='print -l ${(o)history%% *} | uniq -c | sort -nr | head -n 10'
+
 # Directory shortcuts
 hash -d downloads=~/Downloads
 hash -d documents=~/Documents
@@ -360,14 +383,24 @@ hash -d projects=~/Projects
 export FZF_BASE=$HOME/.fzf
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
+# Улучшенный поиск в истории
+if [ -f ~/.fzf.zsh ]; then
+    export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info"
+    export FZF_CTRL_R_OPTS="--sort --exact"
+fi
+
 # Custom key bindings
-bindkey '^[[A' history-substring-search-up
-bindkey '^[[B' history-substring-search-down
-bindkey "^[[H" beginning-of-line
-bindkey "^[[F" end-of-line
-bindkey "^[[3~" delete-char
-bindkey "^[[1;5C" forward-word
-bindkey "^[[1;5D" backward-word
+bindkey "^[[H" beginning-of-line              # Home
+bindkey "^[[F" end-of-line                    # End
+bindkey "^[[3~" delete-char                   # Delete
+bindkey "^[[1;5C" forward-word                # Ctrl+Right
+bindkey "^[[1;5D" backward-word               # Ctrl+Left
+bindkey '^U' backward-kill-line               # Ctrl+U удаляет от курсора до начала строки
+bindkey '^K' kill-line                        # Ctrl+K удаляет от курсора до конца строки
+bindkey '^W' backward-kill-word               # Ctrl+W удаляет слово перед курсором
+
+# Автодополнение с учетом регистра
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
