@@ -1,34 +1,101 @@
 #!/bin/bash
 
+# Функции для форматированного вывода
+print_step() {
+    echo -e "\n📦 \033[1m$1\033[0m"
+}
+
+print_info() {
+    echo -e "   ℹ️  $1"
+}
+
+print_success() {
+    echo -e "   ✅ $1"
+}
+
+print_error() {
+    echo -e "   ❌ \033[31m$1\033[0m"
+}
+
+# Функция для отображения спиннера
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf "   \033[34m%c\033[0m  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
+# Функция для выполнения команды с индикатором прогресса
+run_with_spinner() {
+    local message=$1
+    shift
+    echo -ne "   🔄 $message"
+    ("$@") &>/dev/null &
+    spinner $!
+    if [ $? -eq 0 ]; then
+        echo -e "\r   ✅ $message"
+    else
+        echo -e "\r   ❌ $message"
+        return 1
+    fi
+}
+
+# Функция для отображения прогресс-бара
+progress_bar() {
+    local current=$1
+    local total=$2
+    local title=$3
+    local width=50
+    local percentage=$((current * 100 / total))
+    local completed=$((width * current / total))
+    local remaining=$((width - completed))
+    
+    printf "\r   📊 \033[1m%s\033[0m [" "$title"
+    printf "%${completed}s" | tr ' ' '█'
+    printf "%${remaining}s" | tr ' ' '░'
+    printf "] %d%%" "$percentage"
+    
+    if [ "$current" -eq "$total" ]; then
+        echo
+    fi
+}
+
 # Функция проверки существующих установок
 check_existing_installation() {
     local USER_HOME="$1"
     local has_existing=false
     local message=""
 
-    echo "Проверка существующих установок..."
+    print_step "Проверка существующих установок"
 
     # Проверка прав доступа к домашней директории
     if [ ! -r "$USER_HOME" ]; then
-        echo "Ошибка: нет прав на чтение домашней директории '$USER_HOME'"
+        print_error "Нет прав на чтение домашней директории '$USER_HOME'"
         return 1
     fi
 
     # Проверка Zsh
     if command -v zsh >/dev/null 2>&1; then
-        echo "Найден: Zsh"
+        print_info "Найден: Zsh"
         has_existing=true
     fi
 
     # Проверка Oh My Zsh
     if [ -d "$USER_HOME/.oh-my-zsh" ]; then
-        echo "Найден: Oh My Zsh"
+        print_info "Найден: Oh My Zsh"
         has_existing=true
     fi
 
     # Проверка Powerlevel10k
     if [ -d "$USER_HOME/.powerlevel10k" ]; then
-        echo "Найден: Powerlevel10k"
+        print_info "Найден: Powerlevel10k"
         has_existing=true
     fi
 
@@ -36,20 +103,21 @@ check_existing_installation() {
     local plugins_dir="${ZSH_CUSTOM:-$USER_HOME/.oh-my-zsh/custom}/plugins"
     if [ -d "$plugins_dir" ]; then
         if [ -d "$plugins_dir/zsh-syntax-highlighting" ]; then
-            echo "Найден: zsh-syntax-highlighting"
+            print_info "Найден: zsh-syntax-highlighting"
             has_existing=true
         fi
         if [ -d "$plugins_dir/zsh-autosuggestions" ]; then
-            echo "Найден: zsh-autosuggestions"
+            print_info "Найден: zsh-autosuggestions"
             has_existing=true
         fi
     fi
 
     # Если найдены существующие установки
     if [ "$has_existing" = true ]; then
-        echo -e "\nНайдены установленные компоненты. Что делаем?"
-        echo "1) Удалить существующие установки и продолжить"
-        echo "2) Отменить установку"
+        echo
+        print_info "Обнаружены существующие установки. Выберите действие:"
+        echo "      1) Удалить существующие установки и продолжить"
+        echo "      2) Отменить установку"
         
         while true; do
             read -r choice
@@ -59,11 +127,11 @@ check_existing_installation() {
                     return $?
                     ;;
                 2)
-                    echo "Установка отменена"
+                    print_info "Установка отменена"
                     exit 0
                     ;;
                 *)
-                    echo "Введите 1 или 2"
+                    print_error "Введите 1 или 2"
                     ;;
             esac
         done
@@ -77,55 +145,42 @@ remove_existing_installation() {
     local USER_HOME="$1"
     local current_shell=$(echo $SHELL)
     
-    echo "Начинаем удаление существующих установок..."
+    print_step "Удаление существующих установок"
     
     # Возврат к bash если текущая оболочка zsh
     if [[ "$current_shell" == *"zsh"* ]]; then
-        echo "Меняем оболочку на bash..."
+        print_info "Смена оболочки на bash..."
         if ! chsh -s $(which bash) $(whoami); then
-            echo "Ошибка при смене оболочки на bash"
+            print_error "Ошибка при смене оболочки на bash"
             return 1
         fi
     fi
 
     # Удаление Oh My Zsh
     if [ -d "$USER_HOME/.oh-my-zsh" ]; then
-        echo "Удаляем Oh My Zsh..."
+        print_info "Удаление Oh My Zsh..."
         rm -rf "$USER_HOME/.oh-my-zsh" 2>/dev/null || sudo rm -rf "$USER_HOME/.oh-my-zsh"
     fi
 
     # Удаление Powerlevel10k
     if [ -d "$USER_HOME/.powerlevel10k" ]; then
-        echo "Удаляем Powerlevel10k..."
+        print_info "Удаление Powerlevel10k..."
         rm -rf "$USER_HOME/.powerlevel10k" 2>/dev/null || sudo rm -rf "$USER_HOME/.powerlevel10k"
     fi
 
     # Удаление конфигурационных файлов
-    echo "Удаляем конфигурационные файлы..."
+    print_info "Удаление конфигурационных файлов..."
     rm -f "$USER_HOME/.zshrc" "$USER_HOME/.zsh_history" "$USER_HOME/.zcompdump"* "$USER_HOME/.p10k.zsh" 2>/dev/null
 
     # Удаление плагинов
     local plugins_dir="${ZSH_CUSTOM:-$USER_HOME/.oh-my-zsh/custom}/plugins"
     if [ -d "$plugins_dir" ]; then
-        echo "Удаляем плагины..."
+        print_info "Удаление плагинов..."
         rm -rf "$plugins_dir/zsh-syntax-highlighting" "$plugins_dir/zsh-autosuggestions" 2>/dev/null || \
         sudo rm -rf "$plugins_dir/zsh-syntax-highlighting" "$plugins_dir/zsh-autosuggestions"
     fi
 
-    # Удаление Zsh
-    if command -v zsh >/dev/null 2>&1; then
-        echo "Удаляем Zsh..."
-        if [[ "$current_shell" == *"zsh"* ]]; then
-            echo "Zsh будет удален после перезапуска терминала"
-            echo "Выполните команду после завершения установки:"
-            echo "sudo apt-get remove --purge -y zsh && sudo apt-get autoremove -y"
-        else
-            sudo DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y zsh
-            sudo apt-get autoremove -y
-        fi
-    fi
-
-    echo "Удаление завершено"
+    print_success "Удаление завершено"
     return 0
 }
 
@@ -134,88 +189,117 @@ install_zsh() {
     local USER_HOME="$1"
     local INSTALL_TYPE="$2"
 
-    echo "Шаг 1: Проверка существующих установок"
-    if ! check_existing_installation "$USER_HOME"; then
-        echo "Ошибка при проверке установок"
-        return 1
-    fi
-
-    echo "Шаг 2: Обновление списка пакетов"
-    if [ "$INSTALL_TYPE" = "root" ]; then
-        apt-get update -qq
-    else
-        sudo apt-get update -qq
-    fi
-
-    echo "Шаг 3: Установка Zsh"
-    if ! command -v zsh >/dev/null 2>&1; then
-        if [ "$INSTALL_TYPE" = "root" ]; then
-            DEBIAN_FRONTEND=noninteractive apt-get install -y zsh
-        else
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y zsh
-        fi
-    fi
-
-    echo "Шаг 4: Установка дополнительных пакетов"
-    local packages=("git" "curl" "wget" "fonts-powerline")
-    for pkg in "${packages[@]}"; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            if [ "$INSTALL_TYPE" = "root" ]; then
-                DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg"
-            else
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg"
-            fi
-        fi
-    done
-
-    echo "Шаг 5: Установка Oh My Zsh"
+    print_step "Установка Oh My Zsh"
     if [ ! -d "$USER_HOME/.oh-my-zsh" ]; then
         [ -f "$USER_HOME/.zshrc" ] && mv "$USER_HOME/.zshrc" "$USER_HOME/.zshrc.pre-oh-my-zsh"
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        print_info "Загрузка и установка Oh My Zsh..."
+        if run_with_spinner "Установка Oh My Zsh" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended; then
+            print_success "Oh My Zsh установлен"
+        else
+            print_error "Ошибка при установке Oh My Zsh"
+            exit 1
+        fi
     fi
 
-    echo "Шаг 6: Установка плагинов"
+    print_step "Установка плагинов"
     local plugins_dir="${ZSH_CUSTOM:-$USER_HOME/.oh-my-zsh/custom}/plugins"
     mkdir -p "$plugins_dir"
     
+    local total_plugins=4
+    local current_plugin=0
+    
+    print_info "Установка плагинов..."
     if [ ! -d "$plugins_dir/zsh-syntax-highlighting" ]; then
-        git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$plugins_dir/zsh-syntax-highlighting"
+        ((current_plugin++))
+        progress_bar $current_plugin $total_plugins "Установка плагинов"
+        if run_with_spinner "zsh-syntax-highlighting" git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git "$plugins_dir/zsh-syntax-highlighting"; then
+            print_success "zsh-syntax-highlighting установлен"
+        else
+            print_error "Ошибка при установке zsh-syntax-highlighting"
+        fi
     fi
     
     if [ ! -d "$plugins_dir/zsh-autosuggestions" ]; then
-        git clone https://github.com/zsh-users/zsh-autosuggestions.git "$plugins_dir/zsh-autosuggestions"
+        ((current_plugin++))
+        progress_bar $current_plugin $total_plugins "Установка плагинов"
+        if run_with_spinner "zsh-autosuggestions" git clone -q https://github.com/zsh-users/zsh-autosuggestions.git "$plugins_dir/zsh-autosuggestions"; then
+            print_success "zsh-autosuggestions установлен"
+        else
+            print_error "Ошибка при установке zsh-autosuggestions"
+        fi
     fi
     
     if [ ! -d "$USER_HOME/.powerlevel10k" ]; then
-        git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$USER_HOME/.powerlevel10k"
+        ((current_plugin++))
+        progress_bar $current_plugin $total_plugins "Установка плагинов"
+        if run_with_spinner "powerlevel10k" git clone -q --depth=1 https://github.com/romkatv/powerlevel10k.git "$USER_HOME/.powerlevel10k"; then
+            print_success "powerlevel10k установлен"
+        else
+            print_error "Ошибка при установке powerlevel10k"
+        fi
     fi
 
     # Установка fzf
-    echo "Установка fzf..."
     if [ ! -d "$USER_HOME/.fzf" ]; then
-        git clone --depth 1 https://github.com/junegunn/fzf.git "$USER_HOME/.fzf"
-        "$USER_HOME/.fzf/install" --all
+        ((current_plugin++))
+        progress_bar $current_plugin $total_plugins "Установка плагинов"
+        if run_with_spinner "Установка fzf" git clone -q --depth 1 https://github.com/junegunn/fzf.git "$USER_HOME/.fzf"; then
+            if run_with_spinner "Настройка fzf" "$USER_HOME/.fzf/install" --all; then
+                print_success "fzf установлен"
+            else
+                print_error "Ошибка при установке fzf"
+            fi
+        else
+            print_error "Ошибка при клонировании fzf"
+        fi
     fi
 
-    echo "Шаг 7: Установка конфигурационного файла из репозитория"
-    echo "Клонирование репозитория с конфигурацией..."
+    print_step "Установка пользовательской конфигурации"
     
     # Создаем временную директорию и клонируем репозиторий
     TEMP_DIR=$(mktemp -d)
-    if ! git clone git@github.com:DarthSadist/my_zsh.git "$TEMP_DIR"; then
-        echo "Ошибка при клонировании репозитория с конфигурацией"
+    print_info "Клонирование репозитория конфигурации..."
+
+    # Проверяем доступность репозитория
+    if ! ssh -T git@github.com &>/dev/null; then
+        print_error "Нет доступа к GitHub через SSH. Проверьте ваши SSH ключи"
         rm -rf "$TEMP_DIR"
         exit 1
     fi
 
-    # Копируем конфигурационный файл и добавляем настройку FZF_BASE
-    if [ -f "$TEMP_DIR/.zshrc" ]; then
-        cp "$TEMP_DIR/.zshrc" "$USER_HOME/.zshrc"
-        echo "Конфигурационный файл скопирован, добавляем настройку fzf..."
-        echo -e "\n# fzf configuration\nexport FZF_BASE=$USER_HOME/.fzf" >> "$USER_HOME/.zshrc"
-        echo "Конфигурационный файл успешно установлен и настроен"
+    if run_with_spinner "Клонирование конфигурации" git clone git@github.com:DarthSadist/my_zsh.git "$TEMP_DIR"; then
+        print_info "Проверка структуры репозитория..."
+        
+        # Проверяем содержимое клонированного репозитория
+        if [ ! -d "$TEMP_DIR" ]; then
+            print_error "Ошибка: директория репозитория не создана"
+            exit 1
+        fi
+
+        # Выводим содержимое для отладки
+        ls -la "$TEMP_DIR"
+
+        # Копируем конфигурационный файл и добавляем настройку FZF_BASE
+        if [ -f "$TEMP_DIR/.zshrc" ]; then
+            print_info "Найден файл конфигурации, устанавливаем..."
+            if run_with_spinner "Установка конфигурации" cp "$TEMP_DIR/.zshrc" "$USER_HOME/.zshrc"; then
+                echo -e "\n# fzf configuration\nexport FZF_BASE=$USER_HOME/.fzf" >> "$USER_HOME/.zshrc"
+                print_success "Конфигурационный файл установлен и настроен"
+            else
+                print_error "Ошибка при копировании конфигурационного файла"
+                rm -rf "$TEMP_DIR"
+                exit 1
+            fi
+        else
+            print_error "Файл .zshrc не найден в репозитории"
+            print_info "Содержимое репозитория:"
+            ls -la "$TEMP_DIR"
+            rm -rf "$TEMP_DIR"
+            exit 1
+        fi
     else
-        echo "Ошибка: конфигурационный файл .zshrc не найден в репозитории"
+        print_error "Ошибка при клонировании репозитория с конфигурацией"
+        print_info "Проверьте доступность репозитория: git@github.com:DarthSadist/my_zsh.git"
         rm -rf "$TEMP_DIR"
         exit 1
     fi
@@ -226,44 +310,50 @@ install_zsh() {
     # Установка прав на файлы
     chown -R $(whoami):$(whoami) "$USER_HOME/.oh-my-zsh" "$USER_HOME/.zshrc" "$USER_HOME/.powerlevel10k" 2>/dev/null
 
-    echo -e "\nУстановка завершена!"
-    echo "Для завершения настройки:"
-    echo "1. Закройте текущий терминал"
-    echo "2. Откройте новый терминал"
-    echo "3. Выполните команду: p10k configure"
+    echo
+    print_success "Установка успешно завершена!"
+    echo
+    print_info "Для завершения настройки:"
+    echo "      1. Закройте текущий терминал"
+    echo "      2. Откройте новый терминал"
+    echo "      3. Выполните команду: p10k configure"
+    echo
 }
 
 # Основная функция
 main() {
-    echo "Установка Zsh"
-    echo "Выберите вариант установки:"
-    echo "1) Установка для текущего пользователя"
-    echo "2) Установка для root"
-    echo "3) Отмена установки"
+    clear
+    echo "╭───────────────────────────────────╮"
+    echo "│     Установка Zsh и Oh My Zsh     │"
+    echo "╰───────────────────────────────────╯"
+    echo
+    print_info "Выберите вариант установки:"
+    echo "      1) Установка для текущего пользователя"
+    echo "      2) Установка для root"
+    echo "      3) Отмена установки"
+    echo
     
     while true; do
         read -r choice
         case $choice in
             1)
-                echo "Установка для текущего пользователя..."
                 install_zsh "$HOME" "user"
                 break
                 ;;
             2)
                 if [ "$EUID" -ne 0 ]; then
-                    echo "Для установки root требуются права администратора"
+                    print_error "Для установки root требуются права администратора"
                     exit 1
                 fi
-                echo "Установка для root..."
                 install_zsh "/root" "root"
                 break
                 ;;
             3)
-                echo "Установка отменена"
+                print_info "Установка отменена"
                 exit 0
                 ;;
             *)
-                echo "Введите 1, 2 или 3"
+                print_error "Введите 1, 2 или 3"
                 ;;
         esac
     done
